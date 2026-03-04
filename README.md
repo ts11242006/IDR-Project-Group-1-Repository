@@ -43,3 +43,5 @@ $$
 \frac{dV}{dt} = \nu S
 $$
 
+# Packages used:
+Numpy, Pandas, Scipy, Matplotlib
