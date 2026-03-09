@@ -5,7 +5,7 @@ from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.integrate import solve_ivp
 
 # Load data
-df = pd.read_csv("Cases 2/ltla_newCasesBySpecimenDate.csv")
+df = pd.read_csv("C:/IMPERIAL/Year 2/IRC/data.csv")
 
 # Filter correct metric
 df = df[df["metric"] == "newCasesBySpecimenDate"]
@@ -47,6 +47,12 @@ r_fit = spline(t_numeric)
 plt.figure(figsize=(10, 5))
 plt.plot(t_numeric, uk_year["r_t"], label="Estimated r(t)", alpha=0.5)
 plt.plot(t_numeric, r_fit, label="Fitted spline r(t)", linewidth=2)
+
+days = [108, 197, 332]
+
+for d in days:
+    plt.axvline(x=d, color="red", linestyle="--")
+
 plt.xlabel("Days since 8 Dec 2020")
 plt.ylabel("Growth rate r(t)")
 plt.legend()
