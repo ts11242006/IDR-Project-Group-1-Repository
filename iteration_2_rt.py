@@ -21,9 +21,9 @@ uk_daily["date"] = pd.to_datetime(
 )
 uk_daily = uk_daily.dropna(subset=["date"]).copy()
 
-# Filter for first vaccine year (8 Dec 2020 → 8 Dec 2021)
-start_date = pd.to_datetime("2020-12-08")
-end_date = pd.to_datetime("2021-12-08")
+# Filter for first vaccine year (8 Feb 2020 → 8 Mar 2021)
+start_date = pd.to_datetime("2020-02-08")
+end_date = pd.to_datetime("2021-03-08")
 mask = (uk_daily["date"] >= start_date) & (uk_daily["date"] <= end_date)
 uk_year = uk_daily.loc[mask].copy()
 uk_year = uk_year.sort_values("date").reset_index(drop=True)
@@ -48,12 +48,12 @@ plt.figure(figsize=(10, 5))
 plt.plot(t_numeric, uk_year["r_t"], label="Estimated r(t)", alpha=0.5)
 plt.plot(t_numeric, r_fit, label="Fitted spline r(t)", linewidth=2)
 
-days = [108, 197, 332]
+days = [46, 135, 270]
 
 for d in days:
     plt.axvline(x=d, color="red", linestyle="--")
 
-plt.xlabel("Days since 8 Dec 2020")
+plt.xlabel("Days since 8 Feb 2020")
 plt.ylabel("Growth rate r(t)")
 plt.legend()
 plt.title("Estimated and Fitted Growth Rate r(t)")
@@ -89,62 +89,78 @@ t_days = (dates_beta - dates_beta[0]).astype('timedelta64[D]').astype(float)
 beta_func = interp1d(t_days, beta_smooth, kind='cubic', fill_value='extrapolate')
 
 # SEIR-V simulation parameters
-N = 67_000_000
-sigma = 0.25
-gamma = 0.2
-nu = 0.005  # tuned vaccination rate
+N = 67_000_000          # UK population
+beta = 0.25             # transmission rate
+sigma = 0.25            # incubation rate
+gamma = 0.1             # recovery rate 
+nu = 0.0005              # constant vaccination rate
 
 # Initial conditions
-I0 = 25000
-E0 = 10000
+I0 = 1000
+E0 = 2000
 R0 = 0
 V0 = 0
-S0 = N - I0 - E0 - R0 - V0
-y0 = [S0, E0, I0, R0, V0]
+D0 = 0
+S0 = N - I0 - E0 - R0 - V0 - D0
 
-# SEIR-V model
-def seirv_timevarying(t, y):
-    S, E, I, R, V = y
-    beta_t = beta_func(t)
-    dSdt = -beta_t * S * I / N - nu * S
-    dEdt = beta_t * S * I / N - sigma * E
-    dIdt = sigma * E - gamma * I
-    dRdt = gamma * I
-    dVdt = nu * S
-    return [dSdt, dEdt, dIdt, dRdt, dVdt]
+y0 = [S0, E0, I0, R0, V0, D0]
 
-# Time span
-T = t_days[-1]
-t_eval = np.linspace(0, T, len(t_days))
 
-solution = solve_ivp(seirv_timevarying, [0, T], y0, t_eval=t_eval)
-S, E, I, R, V = solution.y
+# SEIR-V ODE system
+
+
+def seirv(t, y):
+    S, E, I, R, V, D = y
+    
+    dSdt = -beta * S * I / N - 0.97 * nu * S + 0.004 * R
+    dEdt = beta * S * I / N - sigma * E
+    dIdt = sigma * E - gamma * I 
+    dRdt = gamma * 0.975 * I
+    dVdt = 0.97 * nu * S
+    dDdt = 0.025 * gamma * I
+    
+    return [dSdt, dEdt, dIdt, dRdt, dVdt, dDdt]
+
+
+# Time span (1 year)
+
+
+t_span = [0, 365]
+t_eval = np.linspace(0, 365, 365)
+
+solution = solve_ivp(seirv, t_span, y0, t_eval=t_eval)
+
+S, E, I, R, V, D = solution.y
+
 
 # Plot results
-plt.figure(figsize=(12,6))
-plt.plot(dates_beta, I, label="Infectious")
-plt.plot(dates_beta, S, label="Susceptible")
-plt.plot(dates_beta, V, label="Vaccinated")
-plt.plot(dates_beta, R, label="Recovered")
-plt.xlabel("Date")
+
+
+plt.figure()
+plt.plot(t_eval, I, label="Infectious")
+plt.plot(t_eval, S, label="Susceptible")
+plt.plot(t_eval, V, label="Vaccinated")
+plt.plot(t_eval, R, label="Recovered")
+plt.plot(t_eval, D, label="Deaths")
+plt.xlabel("Days")
 plt.ylabel("Population")
 plt.legend()
-plt.title("SEIR-V Simulation with Scaled β(t) and Adjusted ν")
-plt.grid(True)
-plt.tight_layout()
+plt.title("SEIR-V Model (Iteration 1, UK)")
 plt.show()
 
-# End-of-year totals
-S_end_tv = S[-1]
-E_end_tv = E[-1]
-I_end_tv = I[-1]
-R_end_tv = R[-1]
-V_end_tv = V[-1]
+# Last values at the end of 1 year
+S_end = S[-1]
+E_end = E[-1]
+I_end = I[-1]
+R_end = R[-1]
+V_end = V[-1]
+D_end = D[-1]
 
-print("Iteration 2 (time-varying β, scaled 1.75×, ν=0.00375) totals at 1 year:")
-print(f"Susceptible: {S_end_tv:.0f}")
-print(f"Exposed:     {E_end_tv:.0f}")
-print(f"Infectious:  {I_end_tv:.0f}")
-print(f"Recovered:   {R_end_tv:.0f}")
-print(f"Vaccinated:  {V_end_tv:.0f}")
-print(f"Total check: {S_end_tv + E_end_tv + I_end_tv + R_end_tv + V_end_tv:.0f} (should = {N})")
+print("Iteration 1 (constant β) totals at 1 year:")
+print(f"Susceptible: {S_end:.0f}")
+print(f"Exposed:     {E_end:.0f}")
+print(f"Infectious:  {I_end:.0f}")
+print(f"Recovered:   {R_end:.0f}")
+print(f"Vaccinated:  {V_end:.0f}")
+print(f"Deaths:      {D_end:.0f}")
+print(f"Total check: {S_end + E_end + I_end + R_end + V_end + D_end:.0f} (should = {N})")
