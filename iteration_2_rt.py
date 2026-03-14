@@ -4,8 +4,9 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import UnivariateSpline, interp1d
 from scipy.integrate import solve_ivp
 
-# Load data
-df = pd.read_csv("C:/IMPERIAL/Year 2/IRC/data.csv")
+# Load data: 
+# download "Itla_newCasesBySpecimenDate.csv" from the teams shared documents and insert the path to the file below.
+df = pd.read_csv("/Users/taiyos/Downloads/data.csv")
 
 # Filter correct metric
 df = df[df["metric"] == "newCasesBySpecimenDate"]
@@ -115,7 +116,7 @@ def seirv(t, y):
     dSdt = -beta * S * I / N - 0.97 * nu * S + 0.004 * R
     dEdt = beta * S * I / N - sigma * E
     dIdt = sigma * E - gamma * I 
-    dRdt = gamma * 0.975 * I
+    dRdt = gamma * 0.975 * I - 0.004 * R 
     dVdt = 0.97 * nu * S
     dDdt = 0.025 * gamma * I
     
@@ -164,3 +165,105 @@ print(f"Recovered:   {R_end:.0f}")
 print(f"Vaccinated:  {V_end:.0f}")
 print(f"Deaths:      {D_end:.0f}")
 print(f"Total check: {S_end + E_end + I_end + R_end + V_end + D_end:.0f} (should = {N})")
+
+#Iteration 2, with time-varying beta
+# SEIR-V simulation parameters
+N = 67_000_000          # UK population
+sigma = 0.25            # incubation rate
+gamma = 0.1             # recovery rate 
+nu = 0.0005              # constant vaccination rate
+
+# Initial conditions
+start_date = pd.to_datetime("2020-02-08")
+
+# Find the index of the row closest to start_date
+start_idx = (uk_year["date"] - start_date).abs().argmin()
+
+print(f"Using date: {uk_year['date'].iloc[start_idx]}")
+
+
+# Use smoothed cases for stability
+cases = uk_year["cases_smooth"].values
+T_infectious = int(round(1 / gamma))      # ~5 days
+T_incubation = int(round(1 / sigma))      # ~4 days
+
+# I0: people currently infectious = cases over last T_infectious days
+I0 = cases[start_idx - T_infectious : start_idx].sum()
+
+# E0: people exposed but not yet infectious = cases in the T_incubation
+#     window just before the infectious window
+E0 = cases[start_idx - T_infectious - T_incubation : start_idx - T_infectious].sum()
+
+# R0: cumulative cases before the exposure window (assumed recovered)
+R0 = cases[: start_idx - T_infectious - T_incubation].sum()
+
+# V0, D0: zero at start (no vaccines, negligible deaths in early Feb 2020)
+V0 = 0
+D0 = 0
+
+S0 = N - I0 - E0 - R0 - V0 - D0
+
+y0 = [S0, E0, I0, R0, V0, D0]
+
+
+# SEIR-V ODE system
+
+
+def seirv(t, y):
+   S, E, I, R, V, D = y
+   b = beta_func(t)  # ← time-varying β(t) from data
+   dSdt = -b * S * I / N - 0.97 * nu * S + 0.004 * R
+   dEdt =  b * S * I / N - sigma * E
+   dIdt =  sigma * E - gamma * I
+   dRdt =  gamma * 0.975 * I - 0.004 * R
+   dVdt =  0.97 * nu * S
+   dDdt =  0.025 * gamma * I
+   
+   return [dSdt, dEdt, dIdt, dRdt, dVdt, dDdt]
+
+
+# Time span (1 year)
+
+
+t_span = [0, 365]
+t_eval = np.linspace(0, 365, 365)
+
+solution = solve_ivp(seirv, t_span, y0, t_eval=t_eval)
+
+S, E, I, R, V, D = solution.y
+
+
+# Plot results
+
+
+plt.figure()
+plt.plot(t_eval, I, label="Infectious")
+plt.plot(t_eval, S, label="Susceptible")
+plt.plot(t_eval, V, label="Vaccinated")
+plt.plot(t_eval, R, label="Recovered")
+plt.plot(t_eval, D, label="Deaths")
+plt.xlabel("Days")
+plt.ylabel("Population")
+plt.legend()
+plt.title("SEIR-V Model (Iteration 2, UK)")
+plt.show()
+
+# Last values at the end of 1 year
+S_end = S[-1]
+E_end = E[-1]
+I_end = I[-1]
+R_end = R[-1]
+V_end = V[-1]
+D_end = D[-1]
+
+print("Iteration 2 (non-constant β) totals at 1 year:")
+print(f"Susceptible: {S_end:.0f}")
+print(f"Exposed:     {E_end:.0f}")
+print(f"Infectious:  {I_end:.0f}")
+print(f"Recovered:   {R_end:.0f}")
+print(f"Vaccinated:  {V_end:.0f}")
+print(f"Deaths:      {D_end:.0f}")
+print(f"Total check: {S_end + E_end + I_end + R_end + V_end + D_end:.0f} (should = {N})")
+
+#After running this, one will see that the susceptible population decreases unrealistically in the first few weeks.
+#This is caused by the large deviation in beta for the first few weeks as seen in the first graph. 
