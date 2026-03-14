@@ -6,7 +6,7 @@ from scipy.integrate import solve_ivp
 
 # Load data: 
 # download "Itla_newCasesBySpecimenDate.csv" from the teams shared documents and insert the path to the file below.
-df = pd.read_csv("/Users/taiyos/Downloads/data.csv")
+df = pd.read_csv("C:/IMPERIAL/Year 2/IRC/data.csv")
 
 # Filter correct metric
 df = df[df["metric"] == "newCasesBySpecimenDate"]
@@ -49,7 +49,7 @@ plt.figure(figsize=(10, 5))
 plt.plot(t_numeric, uk_year["r_t"], label="Estimated r(t)", alpha=0.5)
 plt.plot(t_numeric, r_fit, label="Fitted spline r(t)", linewidth=2)
 
-days = [46, 135, 270]
+days = [46, 135, 271, 298]
 
 for d in days:
     plt.axvline(x=d, color="red", linestyle="--")
@@ -143,6 +143,10 @@ plt.plot(t_eval, S, label="Susceptible")
 plt.plot(t_eval, V, label="Vaccinated")
 plt.plot(t_eval, R, label="Recovered")
 plt.plot(t_eval, D, label="Deaths")
+days = [46, 135, 271, 298]
+
+for d in days:
+    plt.axvline(x=d, color="red", linestyle="--")
 plt.xlabel("Days")
 plt.ylabel("Population")
 plt.legend()
@@ -241,6 +245,11 @@ plt.plot(t_eval, S, label="Susceptible")
 plt.plot(t_eval, V, label="Vaccinated")
 plt.plot(t_eval, R, label="Recovered")
 plt.plot(t_eval, D, label="Deaths")
+
+days = [46, 135, 271, 298]
+
+for d in days:
+    plt.axvline(x=d, color="red", linestyle="--")
 plt.xlabel("Days")
 plt.ylabel("Population")
 plt.legend()
