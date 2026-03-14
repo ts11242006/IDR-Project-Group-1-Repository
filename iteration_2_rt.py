@@ -174,7 +174,6 @@ gamma = 0.1             # recovery rate
 nu = 0.0005              # constant vaccination rate
 
 # Initial conditions
-start_date = pd.to_datetime("2020-02-08")
 
 # Find the index of the row closest to start_date
 start_idx = (uk_year["date"] - start_date).abs().argmin()
