@@ -187,3 +187,104 @@ plt.title("Estimated Vaccination Rate")
 plt.legend()
 
 plt.show()
+
+sigma = 0.25
+gamma = 0.1
+
+start_idx = (uk_year["date"] - start_date).abs().argmin()
+
+print(f"Using date: {uk_year['date'].iloc[start_idx]}")
+
+cases = uk_year["cases_smooth"].values
+
+T_infectious = int(round(1 / gamma))
+T_incubation = int(round(1 / sigma))
+
+I0 = cases[start_idx - T_infectious : start_idx].sum()
+
+E0 = cases[
+    start_idx - T_infectious - T_incubation :
+    start_idx - T_infectious
+].sum()
+
+R0 = cases[: start_idx - T_infectious - T_incubation].sum()
+
+V0 = 0
+D0 = 0
+
+S0 = N - I0 - E0 - R0 - V0 - D0
+
+y0 = [S0,E0,I0,R0,V0,D0]
+
+
+# SEIR-V-D MODEL
+
+
+def seirv(t,y):
+
+    S,E,I,R,V,D = y
+
+    b = beta_func(t)
+    nu = nu_func(t)
+
+    dSdt = -b*S*I/N - 0.97*nu*S + 0.004*R
+    dEdt = b*S*I/N - sigma*E
+    dIdt = sigma*E - gamma*I
+    dRdt = gamma*0.975*I - 0.004*R
+    dVdt = 0.97*nu*S
+    dDdt = 0.025*gamma*I
+
+    return [dSdt,dEdt,dIdt,dRdt,dVdt,dDdt]
+
+# SIMULATION
+
+t_span = [0,365]
+
+t_eval = np.linspace(0,365,365)
+
+solution = solve_ivp(seirv,t_span,y0,t_eval=t_eval)
+
+S,E,I,R,V,D = solution.y
+
+# -----------------------------
+# PLOT RESULTS
+# -----------------------------
+
+plt.figure()
+
+plt.plot(t_eval,I,label="Infectious")
+plt.plot(t_eval,S,label="Susceptible")
+plt.plot(t_eval,V,label="Vaccinated")
+plt.plot(t_eval,R,label="Recovered")
+plt.plot(t_eval,D,label="Deaths")
+
+days = [46,135,271,298]
+
+for d in days:
+    plt.axvline(x=d,color="red",linestyle="--")
+
+plt.xlabel("Days")
+plt.ylabel("Population")
+plt.legend()
+plt.title("SEIR-V Model (Iteration 2, UK)")
+plt.show()
+
+# FINAL TOTALS
+
+S_end = S[-1]
+E_end = E[-1]
+I_end = I[-1]
+R_end = R[-1]
+V_end = V[-1]
+D_end = D[-1]
+
+print("Iteration 3 totals at 1 year:")
+
+print(f"Susceptible: {S_end:.0f}")
+print(f"Exposed: {E_end:.0f}")
+print(f"Infectious: {I_end:.0f}")
+print(f"Recovered: {R_end:.0f}")
+print(f"Vaccinated: {V_end:.0f}")
+print(f"Deaths: {D_end:.0f}")
+
+print(f"Total check: {S_end + E_end + I_end + R_end + V_end + D_end:.0f} (should = {N})")
